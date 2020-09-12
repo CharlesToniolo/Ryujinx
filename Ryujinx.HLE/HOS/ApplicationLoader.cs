@@ -8,9 +8,11 @@ using LibHac.FsSystem;
 using LibHac.FsSystem.NcaUtils;
 using LibHac.Ns;
 using Ryujinx.Common.Configuration;
+using Ryujinx.Common.IO;
 using Ryujinx.Common.Logging;
 using Ryujinx.HLE.FileSystem;
 using Ryujinx.HLE.FileSystem.Content;
+using Ryujinx.HLE.Loaders.Dlc;
 using Ryujinx.HLE.Loaders.Executables;
 using Ryujinx.HLE.Loaders.Npdm;
 using System;
@@ -266,13 +268,21 @@ namespace Ryujinx.HLE.HOS
 
             if (File.Exists(titleAocMetadataPath))
             {
-                List<DlcContainer> dlcContainerList = JsonHelper.DeserializeFromFile<List<DlcContainer>>(titleAocMetadataPath);
+                var localStorageManagement = new LocalStorageManagement();
 
-                foreach (DlcContainer dlcContainer in dlcContainerList)
+                var dlcContainerLoader = new DlcContainerLoader(titleAocMetadataPath, localStorageManagement);
+
+                foreach (var dlcContainer in dlcContainerLoader.Load())
                 {
-                    foreach (DlcNca dlcNca in dlcContainer.DlcNcaList)
+                    var dlcNcaLoader = new DlcNcaLoader(mainNca.Header.TitleId.ToString("x16"), dlcContainer.Path, localStorageManagement, _fileSystem);
+
+                    var dlcNcaList = dlcNcaLoader.GetDlcNcas();
+
+                    foreach (var dlcNca in dlcNcaList)
                     {
-                        _contentManager.AddAocItem(dlcNca.TitleId, dlcContainer.Path, dlcNca.Path, dlcNca.Enabled);
+                        var savedDlcNca = dlcContainer.DlcNcaList.FirstOrDefault(d => d.TitleId == dlcNca.TitleId);
+
+                        _contentManager.AddAocItem(dlcNca.TitleId, dlcContainer.Path, dlcNca.Path, savedDlcNca.Enabled);
                     }
                 }
             }
