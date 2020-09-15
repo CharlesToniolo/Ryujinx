@@ -64,7 +64,7 @@
     <EmbeddedResource Include="Ui\MainWindow.glade" />
     <EmbeddedResource Include="Ui\ProfileDialog.glade" />
     <EmbeddedResource Include="Ui\SettingsWindow.glade" />
-    <EmbeddedResource Include="Ui\DlcWindow.glade" />
+    <EmbeddedResource Include="Ui\Windows\DlcWindow.glade" />
     <EmbeddedResource Include="Ui\TitleUpdateWindow.glade" />
   </ItemGroup>
 

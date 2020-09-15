@@ -18,6 +18,9 @@ namespace Ryujinx.Common.Configuration
 
         public IList<DlcContainer> Load()
         {
+            if (!_localStorageManagement.Exists(_dlcJsonPath))
+                return new List<DlcContainer>();
+
             using var fileStream = _localStorageManagement.OpenRead(_dlcJsonPath);
 
             return JsonHelper.Deserialize<IEnumerable<DlcContainer>>(fileStream)
