@@ -326,9 +326,7 @@ namespace Ryujinx.HLE.HOS
                 {
                     var dlcNcaLoader = new DlcNcaLoader(mainNca.Header.TitleId.ToString("x16"), dlcContainer.Path, localStorageManagement, _fileSystem);
 
-                    var dlcNcaList = dlcNcaLoader.GetDlcNcas();
-
-                    foreach (var dlcNca in dlcNcaList)
+                    foreach (var dlcNca in dlcNcaLoader.Load())
                     {
                         var savedDlcNca = dlcContainer.DlcNcaList.FirstOrDefault(d => d.TitleId == dlcNca.TitleId);
 

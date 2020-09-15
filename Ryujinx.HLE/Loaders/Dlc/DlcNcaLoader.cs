@@ -28,7 +28,7 @@ namespace Ryujinx.HLE.Loaders.Dlc
             _virtualFileSystem = virtualFileSystem;
         }
 
-        public IEnumerable<DlcNca> GetDlcNcas()
+        public IEnumerable<DlcNca> Load()
         {
             var dlcNcaList = new List<DlcNca>();
 
@@ -41,9 +41,7 @@ namespace Ryujinx.HLE.Loaders.Dlc
             {
                 pfs.OpenFile(out IFile ncaFile, fileEntry.FullPath.ToU8Span(), OpenMode.Read).ThrowIfFailure();
 
-                var nca = TryCreateNca(ncaFile.AsStorage(), _containerPath);
-
-                if (nca == null)
+                if (!TryCreateNca(ncaFile.AsStorage(), _containerPath, out var nca))
                     continue;
 
                 if (nca.Header.ContentType == NcaContentType.PublicData)
@@ -58,11 +56,12 @@ namespace Ryujinx.HLE.Loaders.Dlc
             return dlcNcaList;
         }
 
-        private Nca TryCreateNca(IStorage ncaStorage, string containerPath)
+        private bool TryCreateNca(IStorage ncaStorage, string containerPath, out Nca nca)
         {
             try
             {
-                return new Nca(_virtualFileSystem.KeySet, ncaStorage);
+                nca = new Nca(_virtualFileSystem.KeySet, ncaStorage);
+                return true;
             }
             catch (InvalidDataException exception)
             {
@@ -73,7 +72,8 @@ namespace Ryujinx.HLE.Loaders.Dlc
                 Logger.Error?.Print(LogClass.Application, $"Your key set is missing a key with the name: {exception.Name}. Errored File: {containerPath}");
             }
 
-            return null;
+            nca = null;
+            return false;
         }
     }
 }

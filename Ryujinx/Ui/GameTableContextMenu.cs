@@ -13,6 +13,7 @@ using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Logging;
 using Ryujinx.Common.Utilities;
 using Ryujinx.HLE.FileSystem;
+using Ryujinx.Ui.Windows;
 using Ryujinx.HLE.HOS;
 using System;
 using System.Buffers;
