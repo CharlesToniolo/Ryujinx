@@ -16,10 +16,10 @@ namespace Ryujinx.Common.Configuration
             _localStorageManagement = localStorageManagement;
         }
 
-        public IList<DlcContainer> Load()
+        public IEnumerable<DlcContainer> Load()
         {
             if (!_localStorageManagement.Exists(_dlcJsonPath))
-                return new List<DlcContainer>();
+                return Enumerable.Empty<DlcContainer>();
 
             using var fileStream = _localStorageManagement.OpenRead(_dlcJsonPath);
 

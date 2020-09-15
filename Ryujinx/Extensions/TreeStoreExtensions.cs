@@ -16,5 +16,17 @@ namespace Ryujinx.Extensions
                 while (treeStore.IterNext(ref childIter));
             }
         }
+
+        public static void ForEach(this TreeStore treeStore, Action<TreeIter> iterAction)
+        {
+            if (treeStore.GetIterFirst(out TreeIter iter))
+            {
+                do
+                {
+                    iterAction.Invoke(iter);
+                } 
+                while (treeStore.IterNext(ref iter));
+            }            
+        }
     }
 }

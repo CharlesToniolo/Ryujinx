@@ -22,7 +22,6 @@ namespace Ryujinx.Ui.Windows
         private readonly VirtualFileSystem _virtualFileSystem;
         private readonly string _titleId;
         private readonly string _dlcJsonPath;
-        private readonly IList<DlcContainer> _dlcContainerList;
         private readonly ILocalStorageManagement _localStorageManagement;
         private readonly TreeStore _treeModel;
 
@@ -51,17 +50,6 @@ namespace Ryujinx.Ui.Windows
             _baseTitleInfoLabel.Text = $"DLC Available for {titleName} [{titleId.ToUpper()}]";
             _localStorageManagement = new LocalStorageManagement();
 
-            var dlcContainerLoader = new DlcContainerLoader(_dlcJsonPath, _localStorageManagement);
-
-            try
-            {
-                _dlcContainerList = dlcContainerLoader.Load();
-            }
-            catch
-            {
-                _dlcContainerList = new List<DlcContainer>();
-            }
-
             _treeModel = new TreeStore(typeof(bool), typeof(string), typeof(string));
 
             LoadDlcTree();
@@ -75,7 +63,9 @@ namespace Ryujinx.Ui.Windows
             _dlcTreeView.AppendColumn(TreeStoreColumn.TitleId.ToString(), new CellRendererText(), "text", (int)TreeStoreColumn.TitleId);
             _dlcTreeView.AppendColumn(TreeStoreColumn.Path.ToString(), new CellRendererText(), "text", (int)TreeStoreColumn.Path);
 
-            foreach (var dlcContainer in _dlcContainerList)
+            var dlcContainerLoader = new DlcContainerLoader(_dlcJsonPath, _localStorageManagement);
+
+            foreach (var dlcContainer in dlcContainerLoader.Load())
             {
                 var parentIter = _treeModel.AppendValues(false, "", dlcContainer.Path);
 
@@ -206,39 +196,31 @@ namespace Ryujinx.Ui.Windows
 
         private void SaveButton_Clicked(object sender, EventArgs args)
         {
-            _dlcContainerList.Clear();
+            var dlcContainerList = new List<DlcContainer>();
 
-            if (_dlcTreeView.Model.GetIterFirst(out TreeIter parentIter))
+            _treeModel.ForEach((parentIter) =>
             {
-                do
+                var dlcContainer = new DlcContainer
                 {
-                    if (_dlcTreeView.Model.IterChildren(out TreeIter childIter, parentIter))
-                    {
-                        DlcContainer dlcContainer = new DlcContainer
-                        {
-                            Path = (string)_dlcTreeView.Model.GetValue(parentIter, 2),
-                            DlcNcaList = new List<DlcNca>()
-                        };
+                    Path = (string)_treeModel.GetValue(parentIter, (int)TreeStoreColumn.Path),
+                    DlcNcaList = new List<DlcNca>()
+                };
 
-                        do
-                        {
-                            dlcContainer.DlcNcaList.Add(new DlcNca(
-                                enabled: (bool)_dlcTreeView.Model.GetValue(childIter, 0),
-                                titleId: Convert.ToUInt64(_dlcTreeView.Model.GetValue(childIter, 1).ToString(), 16),
-                                path: (string)_dlcTreeView.Model.GetValue(childIter, 2)
-                            ));
-                        }
-                        while (_dlcTreeView.Model.IterNext(ref childIter));
+                _treeModel.ForEachChildren(parentIter, (ncaIter) =>
+                {
+                    dlcContainer.DlcNcaList.Add(new DlcNca(
+                        enabled: (bool)_treeModel.GetValue(ncaIter, (int)TreeStoreColumn.Enabled),
+                        titleId: Convert.ToUInt64(_treeModel.GetValue(ncaIter, (int)TreeStoreColumn.TitleId).ToString(), 16),
+                        path: (string)_treeModel.GetValue(ncaIter, (int)TreeStoreColumn.Path)
+                    ));
+                });
 
-                        _dlcContainerList.Add(dlcContainer);
-                    }
-                }
-                while (_dlcTreeView.Model.IterNext(ref parentIter));
-            }
+                dlcContainerList.Add(dlcContainer);
+            });
 
             using (FileStream dlcJsonStream = File.Create(_dlcJsonPath, 4096, FileOptions.WriteThrough))
             {
-                dlcJsonStream.Write(Encoding.UTF8.GetBytes(JsonHelper.Serialize(_dlcContainerList, true)));
+                dlcJsonStream.Write(Encoding.UTF8.GetBytes(JsonHelper.Serialize(dlcContainerList, true)));
             }
 
             Dispose();
