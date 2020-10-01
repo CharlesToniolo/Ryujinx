@@ -87,8 +87,12 @@ namespace Ryujinx.Graphics.Gpu.Engine
 
             state.RegisterCallback(MethodOffset.ResetCounter, ResetCounter);
 
-            state.RegisterCallback(MethodOffset.DrawEnd,   DrawEnd);
-            state.RegisterCallback(MethodOffset.DrawBegin, DrawBegin);
+            state.RegisterCallback(MethodOffset.DrawEnd,                      DrawEnd);
+            state.RegisterCallback(MethodOffset.DrawBegin,                    DrawBegin);
+            state.RegisterCallback(MethodOffset.DrawIndexedSmall,             DrawIndexedSmall);
+            state.RegisterCallback(MethodOffset.DrawIndexedSmall2,            DrawIndexedSmall2);
+            state.RegisterCallback(MethodOffset.DrawIndexedSmallIncInstance,  DrawIndexedSmallIncInstance);
+            state.RegisterCallback(MethodOffset.DrawIndexedSmallIncInstance2, DrawIndexedSmallIncInstance2);
 
             state.RegisterCallback(MethodOffset.IndexBufferCount, SetIndexBufferCount);
 
@@ -111,7 +115,9 @@ namespace Ryujinx.Graphics.Gpu.Engine
         /// Updates host state based on the current guest GPU state.
         /// </summary>
         /// <param name="state">Guest GPU state</param>
-        private void UpdateState(GpuState state)
+        /// <param name="firstIndex">Index of the first index buffer element used on the draw</param>
+        /// <param name="indexCount">Number of index buffer elements used on the draw</param>
+        private void UpdateState(GpuState state, int firstIndex, int indexCount)
         {
             bool tfEnable = state.Get<Boolean32>(MethodOffset.TfEnable);
 
@@ -233,7 +239,7 @@ namespace Ryujinx.Graphics.Gpu.Engine
 
             if (state.QueryModified(MethodOffset.IndexBufferState))
             {
-                UpdateIndexBufferState(state);
+                UpdateIndexBufferState(state, firstIndex, indexCount);
             }
 
             if (state.QueryModified(MethodOffset.VertexBufferDrawState,
@@ -273,7 +279,7 @@ namespace Ryujinx.Graphics.Gpu.Engine
 
             if (tfEnable && !_prevTfEnable)
             {
-                _context.Renderer.Pipeline.BeginTransformFeedback(PrimitiveType.Convert());
+                _context.Renderer.Pipeline.BeginTransformFeedback(Topology);
                 _prevTfEnable = true;
             }
         }
@@ -488,25 +494,12 @@ namespace Ryujinx.Graphics.Gpu.Engine
         /// <param name="state">Current GPU state</param>
         private void UpdateViewportTransform(GpuState state)
         {
-            DepthMode depthMode = state.Get<DepthMode>(MethodOffset.DepthMode);
+            var yControl = state.Get<YControl> (MethodOffset.YControl);
+            var face     = state.Get<FaceState>(MethodOffset.FaceState);
 
-            _context.Renderer.Pipeline.SetDepthMode(depthMode);
+            UpdateFrontFace(yControl, face.FrontFace);
 
-            YControl yControl = state.Get<YControl>(MethodOffset.YControl);
-
-            bool   flipY  = yControl.HasFlag(YControl.NegateY);
-            Origin origin = yControl.HasFlag(YControl.TriangleRastFlip) ? Origin.LowerLeft : Origin.UpperLeft;
-
-            _context.Renderer.Pipeline.SetOrigin(origin);
-
-            // The triangle rast flip flag only affects rasterization, the viewport is not flipped.
-            // Setting the origin mode to upper left on the host, however, not only affects rasterization,
-            // but also flips the viewport.
-            // We negate the effects of flipping the viewport by flipping it again using the viewport swizzle.
-            if (origin == Origin.UpperLeft)
-            {
-                flipY = !flipY;
-            }
+            bool flipY = yControl.HasFlag(YControl.NegateY);
 
             Span<Viewport> viewports = stackalloc Viewport[Constants.TotalViewports];
 
@@ -515,11 +508,42 @@ namespace Ryujinx.Graphics.Gpu.Engine
                 var transform = state.Get<ViewportTransform>(MethodOffset.ViewportTransform, index);
                 var extents   = state.Get<ViewportExtents>  (MethodOffset.ViewportExtents,   index);
 
-                float x = transform.TranslateX - MathF.Abs(transform.ScaleX);
-                float y = transform.TranslateY - MathF.Abs(transform.ScaleY);
+                float scaleX = MathF.Abs(transform.ScaleX);
+                float scaleY = transform.ScaleY;
 
-                float width  = MathF.Abs(transform.ScaleX) * 2;
-                float height = MathF.Abs(transform.ScaleY) * 2;
+                if (flipY)
+                {
+                    scaleY = -scaleY;
+                }
+
+                if (!_context.Capabilities.SupportsViewportSwizzle && transform.UnpackSwizzleY() == ViewportSwizzle.NegativeY)
+                {
+                    scaleY = -scaleY;
+                }
+
+                if (index == 0)
+                {
+                    // Try to guess the depth mode being used on the high level API
+                    // based on current transform.
+                    // It is setup like so by said APIs:
+                    // If depth mode is ZeroToOne:
+                    //  TranslateZ = Near
+                    //  ScaleZ = Far - Near
+                    // If depth mode is MinusOneToOne:
+                    //  TranslateZ = (Near + Far) / 2
+                    //  ScaleZ = (Far - Near) / 2
+                    // DepthNear/Far are sorted such as that Near is always less than Far.
+                    DepthMode depthMode = extents.DepthNear != transform.TranslateZ &&
+                                          extents.DepthFar  != transform.TranslateZ ? DepthMode.MinusOneToOne : DepthMode.ZeroToOne;
+
+                    _context.Renderer.Pipeline.SetDepthMode(depthMode);
+                }
+
+                float x = transform.TranslateX - scaleX;
+                float y = transform.TranslateY - scaleY;
+
+                float width  = scaleX * 2;
+                float height = scaleY * 2;
 
                 float scale = TextureManager.RenderTargetScale;
                 if (scale != 1f)
@@ -537,34 +561,17 @@ namespace Ryujinx.Graphics.Gpu.Engine
                 ViewportSwizzle swizzleZ = transform.UnpackSwizzleZ();
                 ViewportSwizzle swizzleW = transform.UnpackSwizzleW();
 
-                if (transform.ScaleX < 0)
-                {
-                    swizzleX ^= ViewportSwizzle.NegativeFlag;
-                }
-
-                if (flipY)
-                {
-                    swizzleY ^= ViewportSwizzle.NegativeFlag;
-                }
-
-                if (transform.ScaleY < 0)
-                {
-                    swizzleY ^= ViewportSwizzle.NegativeFlag;
-                }
+                float depthNear = extents.DepthNear;
+                float depthFar  = extents.DepthFar;
 
                 if (transform.ScaleZ < 0)
                 {
-                    swizzleZ ^= ViewportSwizzle.NegativeFlag;
+                    float temp = depthNear;
+                    depthNear  = depthFar;
+                    depthFar   = temp;
                 }
 
-                viewports[index] = new Viewport(
-                    region,
-                    swizzleX,
-                    swizzleY,
-                    swizzleZ,
-                    swizzleW,
-                    extents.DepthNear,
-                    extents.DepthFar);
+                viewports[index] = new Viewport(region, swizzleX, swizzleY, swizzleZ, swizzleW, depthNear, depthFar);
             }
 
             _context.Renderer.Pipeline.SetViewports(0, viewports);
@@ -741,14 +748,13 @@ namespace Ryujinx.Graphics.Gpu.Engine
         /// Updates host index buffer binding based on guest GPU state.
         /// </summary>
         /// <param name="state">Current GPU state</param>
-        private void UpdateIndexBufferState(GpuState state)
+        /// <param name="firstIndex">Index of the first index buffer element used on the draw</param>
+        /// <param name="indexCount">Number of index buffer elements used on the draw</param>
+        private void UpdateIndexBufferState(GpuState state, int firstIndex, int indexCount)
         {
             var indexBuffer = state.Get<IndexBufferState>(MethodOffset.IndexBufferState);
 
-            _firstIndex = indexBuffer.First;
-            _indexCount = indexBuffer.Count;
-
-            if (_indexCount == 0)
+            if (indexCount == 0)
             {
                 return;
             }
@@ -757,7 +763,7 @@ namespace Ryujinx.Graphics.Gpu.Engine
 
             // Do not use the end address to calculate the size, because
             // the result may be much larger than the real size of the index buffer.
-            ulong size = (ulong)(_firstIndex + _indexCount);
+            ulong size = (ulong)(firstIndex + indexCount);
 
             switch (indexBuffer.Type)
             {
@@ -805,7 +811,7 @@ namespace Ryujinx.Graphics.Gpu.Engine
 
                 ulong size;
 
-                if (_inlineIndexCount != 0 || _drawIndexed || stride == 0 || instanced)
+                if (_ibStreamer.HasInlineIndexData || _drawIndexed || stride == 0 || instanced)
                 {
                     // This size may be (much) larger than the real vertex buffer size.
                     // Avoid calculating it this way, unless we don't have any other option.
@@ -832,11 +838,29 @@ namespace Ryujinx.Graphics.Gpu.Engine
         /// <param name="state">Current GPU state</param>
         private void UpdateFaceState(GpuState state)
         {
-            var face = state.Get<FaceState>(MethodOffset.FaceState);
+            var yControl = state.Get<YControl> (MethodOffset.YControl);
+            var face     = state.Get<FaceState>(MethodOffset.FaceState);
 
             _context.Renderer.Pipeline.SetFaceCulling(face.CullEnable, face.CullFace);
 
-            _context.Renderer.Pipeline.SetFrontFace(face.FrontFace);
+            UpdateFrontFace(yControl, face.FrontFace);
+        }
+
+        /// <summary>
+        /// Updates the front face based on the current front face and the origin.
+        /// </summary>
+        /// <param name="yControl">Y control register value, where the origin is located</param>
+        /// <param name="frontFace">Front face</param>
+        private void UpdateFrontFace(YControl yControl, FrontFace frontFace)
+        {
+            bool isUpperLeftOrigin = !yControl.HasFlag(YControl.TriangleRastFlip);
+
+            if (isUpperLeftOrigin)
+            {
+                frontFace = frontFace == FrontFace.CounterClockwise ? FrontFace.Clockwise : FrontFace.CounterClockwise;
+            }
+
+            _context.Renderer.Pipeline.SetFrontFace(frontFace);
         }
 
         /// <summary>

@@ -348,7 +348,7 @@ namespace Ryujinx.Graphics.Gpu.Image
         /// <summary>
         /// Update host framebuffer attachments based on currently bound render target buffers.
         /// </summary>
-        private void UpdateRenderTargets()
+        public void UpdateRenderTargets()
         {
             bool anyChanged = false;
 
@@ -771,7 +771,7 @@ namespace Ryujinx.Graphics.Gpu.Image
                 // Any textures that are incompatible will contain garbage data, so they should be removed where possible.
 
                 int viewCompatible = 0;
-                bool setData = isSamplerTexture || overlapsCount == 0;
+                bool setData = isSamplerTexture || overlapsCount == 0 || flags.HasFlag(TextureSearchFlags.ForCopy);
 
                 for (int index = 0; index < overlapsCount; index++)
                 {

@@ -35,7 +35,7 @@ namespace Ryujinx.HLE.HOS.Services.Hid
         private HidAccelerometerParameters _accelerometerParams;
         private HidVibrationValue          _vibrationValue;
 
-        public IHidServer(ServiceCtx context)
+        public IHidServer(ServiceCtx context) : base(new ServerBase("HidServer"))
         {
             _xpadIdEvent                 = new KEvent(context.Device.System.KernelContext);
             _palmaOperationCompleteEvent = new KEvent(context.Device.System.KernelContext);
@@ -1498,6 +1498,18 @@ namespace Ryujinx.HLE.HOS.Services.Hid
             context.ResponseData.Write(_npadCommunicationMode);
 
             Logger.Stub?.PrintStub(LogClass.ServiceHid, new { _npadCommunicationMode });
+
+            return ResultCode.Success;
+        }
+
+        [Command(1002)] // 9.0.0+
+        // SetTouchScreenConfiguration(nn::hid::TouchScreenConfigurationForNx, nn::applet::AppletResourceUserId)
+        public ResultCode SetTouchScreenConfiguration(ServiceCtx context)
+        {
+            long touchScreenConfigurationForNx = context.RequestData.ReadInt64();
+            long appletResourceUserId          = context.RequestData.ReadInt64();
+
+            Logger.Stub?.PrintStub(LogClass.ServiceHid, new { appletResourceUserId, touchScreenConfigurationForNx });
 
             return ResultCode.Success;
         }

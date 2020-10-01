@@ -2,6 +2,7 @@ using Gtk;
 using Ryujinx.Common.Logging;
 using Ryujinx.HLE;
 using Ryujinx.HLE.HOS.Applets;
+using Ryujinx.HLE.HOS.Services.Am.AppletOE.ApplicationProxyService.ApplicationProxy.Types;
 using System;
 using System.Threading;
 
@@ -120,6 +121,63 @@ namespace Ryujinx.Ui
             userText = error ? null : inputText;
 
             return error || okPressed;
+        }
+
+        public void ExecuteProgram(HLE.Switch device, ProgramSpecifyKind kind, ulong value)
+        {
+            device.UserChannelPersistence.ExecuteProgram(kind, value);
+            MainWindow.GlWidget?.Exit();
+        }
+
+        public bool DisplayErrorAppletDialog(string title, string message, string[] buttons)
+        {
+            ManualResetEvent dialogCloseEvent = new ManualResetEvent(false);
+            bool showDetails = false;
+
+            Application.Invoke(delegate
+            {
+                try
+                {
+                    ErrorAppletDialog msgDialog = new ErrorAppletDialog(_parent, DialogFlags.DestroyWithParent, MessageType.Error, buttons)
+                    {
+                        Title          = title,
+                        Text           = message,
+                        UseMarkup      = true,
+                        WindowPosition = WindowPosition.CenterAlways
+                    };
+
+                    msgDialog.SetDefaultSize(400, 0);
+
+                    msgDialog.Response += (object o, ResponseArgs args) =>
+                    {
+                        if (buttons != null)
+                        {
+                            if (buttons.Length > 1)
+                            {
+                                if (args.ResponseId != (ResponseType)(buttons.Length - 1))
+                                {
+                                    showDetails = true;
+                                }
+                            }
+                        }
+
+                        dialogCloseEvent.Set();
+                        msgDialog?.Dispose();
+                    };
+
+                    msgDialog.Show();
+                }
+                catch (Exception e)
+                {
+                    Logger.Error?.Print(LogClass.Application, $"Error displaying ErrorApplet Dialog: {e}");
+
+                    dialogCloseEvent.Set();
+                }
+            });
+
+            dialogCloseEvent.WaitOne();
+
+            return showDetails;
         }
     }
 }

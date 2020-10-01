@@ -202,7 +202,7 @@ namespace ARMeilleure.Translation
 
             Logger.StartPass(PassName.RegisterUsage);
 
-            RegisterUsage.RunPass(cfg, mode, isCompleteFunction: false);
+            RegisterUsage.RunPass(cfg, mode);
 
             Logger.EndPass(PassName.RegisterUsage);
 
@@ -290,7 +290,7 @@ namespace ARMeilleure.Translation
             return context.GetControlFlowGraph();
         }
 
-        private static void EmitSynchronization(EmitterContext context)
+        internal static void EmitSynchronization(EmitterContext context)
         {
             long countOffs = NativeContext.GetCounterOffset();
 
@@ -301,11 +301,11 @@ namespace ARMeilleure.Translation
             Operand lblNonZero = Label();
             Operand lblExit    = Label();
 
-            context.BranchIfTrue(lblNonZero, count);
+            context.BranchIfTrue(lblNonZero, count, BasicBlockFrequency.Cold);
 
             Operand running = context.Call(typeof(NativeInterface).GetMethod(nameof(NativeInterface.CheckSynchronization)));
 
-            context.BranchIfTrue(lblExit, running);
+            context.BranchIfTrue(lblExit, running, BasicBlockFrequency.Cold);
 
             context.Return(Const(0L));
 

@@ -147,23 +147,23 @@ namespace Ryujinx.Graphics.Gpu.Shader
         /// <returns>Current primitive topology</returns>
         public InputTopology QueryPrimitiveTopology()
         {
-            switch (_context.Methods.PrimitiveType)
+            switch (_context.Methods.Topology)
             {
-                case PrimitiveType.Points:
+                case PrimitiveTopology.Points:
                     return InputTopology.Points;
-                case PrimitiveType.Lines:
-                case PrimitiveType.LineLoop:
-                case PrimitiveType.LineStrip:
+                case PrimitiveTopology.Lines:
+                case PrimitiveTopology.LineLoop:
+                case PrimitiveTopology.LineStrip:
                     return InputTopology.Lines;
-                case PrimitiveType.LinesAdjacency:
-                case PrimitiveType.LineStripAdjacency:
+                case PrimitiveTopology.LinesAdjacency:
+                case PrimitiveTopology.LineStripAdjacency:
                     return InputTopology.LinesAdjacency;
-                case PrimitiveType.Triangles:
-                case PrimitiveType.TriangleStrip:
-                case PrimitiveType.TriangleFan:
+                case PrimitiveTopology.Triangles:
+                case PrimitiveTopology.TriangleStrip:
+                case PrimitiveTopology.TriangleFan:
                     return InputTopology.Triangles;
-                case PrimitiveType.TrianglesAdjacency:
-                case PrimitiveType.TriangleStripAdjacency:
+                case PrimitiveTopology.TrianglesAdjacency:
+                case PrimitiveTopology.TriangleStripAdjacency:
                     return InputTopology.TrianglesAdjacency;
             }
 
@@ -187,12 +187,6 @@ namespace Ryujinx.Graphics.Gpu.Shader
         /// </summary>
         /// <returns>True if the GPU and driver supports non-constant texture offsets, false otherwise</returns>
         public bool QuerySupportsNonConstantTextureOffset() => _context.Capabilities.SupportsNonConstantTextureOffset;
-
-        /// <summary>
-        /// Queries host GPU viewport swizzle support.
-        /// </summary>
-        /// <returns>True if the GPU and driver supports viewport swizzle, false otherwise</returns>
-        public bool QuerySupportsViewportSwizzle() => _context.Capabilities.SupportsViewportSwizzle;
 
         /// <summary>
         /// Queries texture format information, for shaders using image load or store.
@@ -254,24 +248,6 @@ namespace Ryujinx.Graphics.Gpu.Shader
                 Format.R10G10B10A2Uint   => TextureFormat.R10G10B10A2Uint,
                 Format.R11G11B10Float    => TextureFormat.R11G11B10Float,
                 _                        => TextureFormat.Unknown
-            };
-        }
-
-        public int QueryViewportSwizzle(int component)
-        {
-            YControl yControl = _state.Get<YControl>(MethodOffset.YControl);
-
-            bool flipY = yControl.HasFlag(YControl.NegateY) ^ !yControl.HasFlag(YControl.TriangleRastFlip);
-
-            ViewportTransform transform = _state.Get<ViewportTransform>(MethodOffset.ViewportTransform, 0);
-
-            return component switch
-            {
-                0 => (int)(transform.UnpackSwizzleX() ^ (transform.ScaleX < 0 ? ViewportSwizzle.NegativeFlag : 0)),
-                1 => (int)(transform.UnpackSwizzleY() ^ (transform.ScaleY < 0 ? ViewportSwizzle.NegativeFlag : 0) ^ (flipY ? ViewportSwizzle.NegativeFlag : 0)),
-                2 => (int)(transform.UnpackSwizzleZ() ^ (transform.ScaleZ < 0 ? ViewportSwizzle.NegativeFlag : 0)),
-                3 => (int)transform.UnpackSwizzleW(),
-                _ => throw new ArgumentOutOfRangeException(nameof(component))
             };
         }
 
