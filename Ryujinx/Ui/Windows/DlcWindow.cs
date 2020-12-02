@@ -161,38 +161,21 @@ namespace Ryujinx.Ui.Windows
 
         private void RemoveButton_Clicked(object sender, EventArgs args)
         {
-            if (_dlcTreeSelection.GetSelected(out ITreeModel treeModel, out TreeIter treeIter))
+            if (_dlcTreeSelection.GetSelected(out _, out TreeIter treeIter))
             {
                 if (_dlcTreeView.Model.IterParent(out TreeIter parentIter, treeIter) && _dlcTreeView.Model.IterNChildren(parentIter) <= 1)
                 {
-                    ((TreeStore)treeModel).Remove(ref parentIter);
+                    _treeModel.Remove(ref parentIter);
                 }
                 else
                 {
-                    ((TreeStore)treeModel).Remove(ref treeIter);
+                    _treeModel.Remove(ref treeIter);
                 }
             }
         }
 
         private void RemoveAllButton_Clicked(object sender, EventArgs args)
-        {
-            List<TreeIter> toRemove = new List<TreeIter>();
-
-            if (_dlcTreeView.Model.GetIterFirst(out TreeIter iter))
-            {
-                do
-                {
-                    toRemove.Add(iter);
-                } 
-                while (_dlcTreeView.Model.IterNext(ref iter));
-            }
-
-            foreach (TreeIter i in toRemove)
-            {
-                TreeIter j = i;
-                ((TreeStore)_dlcTreeView.Model).Remove(ref j);
-            }
-        }
+            => _treeModel.Clear();
 
         private void SaveButton_Clicked(object sender, EventArgs args)
         {
