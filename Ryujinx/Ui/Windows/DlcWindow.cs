@@ -173,7 +173,7 @@ namespace Ryujinx.Ui.Windows
                 }
             }
         }
-        
+
         private void RemoveAllButton_Clicked(object sender, EventArgs args)
         {
             List<TreeIter> toRemove = new List<TreeIter>();
