@@ -5,10 +5,8 @@ namespace Ryujinx.Common.IO
 {
     public sealed class LocalStorageManagement : ILocalStorageManagement
     {
-        public bool Exists(string filePath)
-            => File.Exists(filePath);
+        public bool Exists(string filePath) => File.Exists(filePath);
 
-        public Stream OpenRead(string filePath)
-            => File.OpenRead(filePath);
+        public Stream OpenRead(string filePath) => File.OpenRead(filePath);
     }
 }

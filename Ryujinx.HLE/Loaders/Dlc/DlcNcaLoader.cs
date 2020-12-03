@@ -42,12 +42,16 @@ namespace Ryujinx.HLE.Loaders.Dlc
                 pfs.OpenFile(out IFile ncaFile, fileEntry.FullPath.ToU8Span(), OpenMode.Read).ThrowIfFailure();
 
                 if (!TryCreateNca(ncaFile.AsStorage(), _containerPath, out var nca))
+                {
                     continue;
+                }                    
 
                 if (nca.Header.ContentType == NcaContentType.PublicData)
                 {
                     if ((nca.Header.TitleId & 0xFFFFFFFFFFFFE000).ToString("x16") != _titleId)
+                    {
                         break;
+                    }                        
 
                     dlcNcaList.Add(new DlcNca(fileEntry.FullPath, nca.Header.TitleId, true));
                 }
@@ -61,18 +65,16 @@ namespace Ryujinx.HLE.Loaders.Dlc
             try
             {
                 nca = new Nca(_virtualFileSystem.KeySet, ncaStorage);
+
                 return true;
             }
             catch (InvalidDataException exception)
             {
                 Logger.Error?.Print(LogClass.Application, $"{exception.Message}. Errored File: {containerPath}");
-            }
-            catch (MissingKeyException exception)
-            {
-                Logger.Error?.Print(LogClass.Application, $"Your key set is missing a key with the name: {exception.Name}. Errored File: {containerPath}");
-            }
+            }            
 
             nca = null;
+
             return false;
         }
     }

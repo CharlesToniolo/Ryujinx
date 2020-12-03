@@ -82,7 +82,9 @@ namespace Ryujinx.Ui.Windows
                     var savedDlcNca = dlcContainer.DlcNcaList.FirstOrDefault(d => d.TitleId == dlcNca.TitleId);
 
                     if (!savedDlcNca.Enabled)
+                    {
                         allChildrenEnabled = false;
+                    }                        
 
                     _treeModel.AppendValues(parentIter, savedDlcNca.Enabled, dlcNca.TitleId.ToString("X16"), dlcNca.Path);
                 }
@@ -102,7 +104,9 @@ namespace Ryujinx.Ui.Windows
                 _treeModel.SetValue(treeIter, (int)TreeStoreColumn.Enabled, newValue);
 
                 if (_treeModel.IterHasChild(treeIter))
+                {
                     _treeModel.ForEachChildren(treeIter, c => _treeModel.SetValue(c, (int)TreeStoreColumn.Enabled, newValue));
+                }                    
                 else
                 {
                     if (_treeModel.IterParent(out var parentIter, treeIter))
@@ -113,8 +117,11 @@ namespace Ryujinx.Ui.Windows
                         _treeModel.ForEachChildren(parentIter, c =>
                         {
                             totalChildren++;
+
                             if ((bool)_treeModel.GetValue(c, (int)TreeStoreColumn.Enabled))
+                            {
                                 totalEnabled++;
+                            }                                
                         });
 
                         _treeModel.SetValue(parentIter, (int)TreeStoreColumn.Enabled, totalEnabled == totalChildren);
@@ -136,7 +143,9 @@ namespace Ryujinx.Ui.Windows
             fileChooser.Filter.AddPattern("*.nsp");
 
             if (fileChooser.Run() != (int)ResponseType.Accept)
+            {
                 return;
+            }                
 
             foreach (string containerPath in fileChooser.Filenames.Where(f => _localStorageManagement.Exists(f)))
             {
@@ -174,8 +183,7 @@ namespace Ryujinx.Ui.Windows
             }
         }
 
-        private void RemoveAllButton_Clicked(object sender, EventArgs args)
-            => _treeModel.Clear();
+        private void RemoveAllButton_Clicked(object sender, EventArgs args) => _treeModel.Clear();
 
         private void SaveButton_Clicked(object sender, EventArgs args)
         {
